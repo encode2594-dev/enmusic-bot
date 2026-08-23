@@ -16,6 +16,9 @@ const {
   DefaultExtractors,
 } = require("@discord-player/extractor");
 
+const ffmpeg = require("ffmpeg-static");
+const { execFile } = require("child_process");
+
 // ========================================
 // DISCORD CLIENT
 // ========================================
@@ -113,12 +116,10 @@ client.once("ready", async () => {
   console.log("================================");
 
   try {
-    // Load extractors
     await player.extractors.loadMulti(DefaultExtractors);
 
     console.log("✅ Extractor berhasil dimuat!");
 
-    // Register slash commands
     const rest = new REST({ version: "10" })
       .setToken(process.env.DISCORD_TOKEN);
 
@@ -130,6 +131,7 @@ client.once("ready", async () => {
     );
 
     console.log("✅ Slash commands berhasil didaftarkan!");
+
   } catch (error) {
     console.error("❌ READY ERROR:");
     console.error(error);
@@ -137,7 +139,7 @@ client.once("ready", async () => {
 });
 
 // ========================================
-// INTERACTION
+// INTERACTION HANDLER
 // ========================================
 
 client.on("interactionCreate", async interaction => {
@@ -192,11 +194,8 @@ client.on("interactionCreate", async interaction => {
                 channel: interaction.channel,
               },
 
-              // =========================
               // DEBUG MODE
-              // =========================
-
-              // Jangan keluar otomatis.
+              // Bot tidak langsung keluar
               leaveOnEnd: false,
               leaveOnStop: false,
               leaveOnEmpty: false,
@@ -208,7 +207,7 @@ client.on("interactionCreate", async interaction => {
 
         console.log("✅ player.play() selesai!");
 
-        if (result && result.track) {
+        if (result?.track) {
 
           console.log("🎵 TRACK:");
           console.log(result.track.title);
@@ -216,7 +215,6 @@ client.on("interactionCreate", async interaction => {
           return interaction.editReply(
             `🎵 **${result.track.title}** masuk ke queue!`
           );
-
         }
 
         return interaction.editReply(
@@ -331,7 +329,8 @@ client.on("interactionCreate", async interaction => {
         message +=
           `▶️ Sekarang: **${queue.currentTrack.title}**\n\n`;
       } else {
-        message += "▶️ Sekarang: Tidak ada\n\n";
+        message +=
+          "▶️ Sekarang: Tidak ada\n\n";
       }
 
       const tracks = queue.tracks.toArray();
@@ -384,7 +383,48 @@ client.on("interactionCreate", async interaction => {
 });
 
 // ========================================
-// GLOBAL ERROR
+// FFMPEG TEST
+// ========================================
+
+console.log("");
+console.log("================================");
+console.log("🎬 FFMPEG CHECK");
+console.log("================================");
+console.log("FFmpeg path:", ffmpeg);
+
+if (!ffmpeg) {
+
+  console.error("❌ FFmpeg binary tidak ditemukan!");
+
+} else {
+
+  execFile(
+    ffmpeg,
+    ["-version"],
+    (error, stdout, stderr) => {
+
+      if (error) {
+
+        console.error("❌ FFmpeg ERROR:");
+        console.error(error);
+
+        if (stderr) {
+          console.error(stderr);
+        }
+
+        return;
+      }
+
+      console.log("✅ FFmpeg BERHASIL!");
+      console.log(
+        stdout.split("\n")[0]
+      );
+    }
+  );
+}
+
+// ========================================
+// GLOBAL ERROR HANDLING
 // ========================================
 
 process.on("unhandledRejection", error => {
