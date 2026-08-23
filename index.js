@@ -7,18 +7,19 @@ const {
 } = require("discord.js");
 
 const {
-  Player,
-  useMainPlayer,
-  useQueue,
-} = require("discord-player");
+  joinVoiceChannel,
+  createAudioPlayer,
+  createAudioResource,
+  AudioPlayerStatus,
+  VoiceConnectionStatus,
+  StreamType,
+  entersState,
+  NoSubscriberBehavior,
+} = require("@discordjs/voice");
 
-const {
-  DefaultExtractors,
-} = require("@discord-player/extractor");
-
-const { FFmpeg } = require("@discord-player/ffmpeg");
-
+const play = require("play-dl");
 const ffmpegPath = require("ffmpeg-static");
+const { spawn } = require("child_process");
 
 // ========================================
 // CONFIG
@@ -27,31 +28,10 @@ const ffmpegPath = require("ffmpeg-static");
 const TOKEN = process.env.DISCORD_TOKEN;
 const GUILD_ID = "1540915302370377749";
 
-// ========================================
-// CHECK TOKEN
-// ========================================
-
 if (!TOKEN) {
   console.error("❌ DISCORD_TOKEN tidak ditemukan!");
   process.exit(1);
 }
-
-// ========================================
-// FFMPEG
-// ========================================
-
-console.log("================================");
-console.log("🎬 FFMPEG CHECK");
-console.log("================================");
-
-console.log("FFmpeg path:", ffmpegPath);
-
-if (!ffmpegPath) {
-  console.error("❌ FFmpeg tidak ditemukan!");
-  process.exit(1);
-}
-
-console.log("✅ FFmpeg tersedia!");
 
 // ========================================
 // CLIENT
@@ -65,10 +45,10 @@ const client = new Client({
 });
 
 // ========================================
-// PLAYER
+// MUSIC STATE
 // ========================================
 
-const player = new Player(client);
+const music = new Map();
 
 // ========================================
 // COMMANDS
@@ -81,7 +61,7 @@ const commands = [
     .addStringOption(option =>
       option
         .setName("song")
-        .setDescription("Nama lagu atau URL SoundCloud")
+        .setDescription("URL SoundCloud atau nama lagu")
         .setRequired(true)
     ),
 
@@ -104,60 +84,160 @@ const commands = [
   new SlashCommandBuilder()
     .setName("queue")
     .setDescription("Lihat queue"),
-].map(command => command.toJSON());
+].map(x => x.toJSON());
 
 // ========================================
-// EVENTS
+// GET GUILD MUSIC
 // ========================================
 
-player.events.on("audioTrackAdd", (queue, track) => {
-  console.log("➕ TRACK ADDED");
-  console.log(track.title);
-});
+function getMusic(guildId) {
+  return music.get(guildId);
+}
 
-player.events.on("playerStart", (queue, track) => {
+// ========================================
+// PLAY STREAM
+// ========================================
+
+async function playTrack(guildId, track) {
+  const data = music.get(guildId);
+
+  if (!data) {
+    throw new Error("Music session tidak ditemukan.");
+  }
+
   console.log("");
   console.log("================================");
-  console.log("▶️ PLAYER START");
-  console.log(track.title);
+  console.log("🎵 STARTING AUDIO");
+  console.log(`🎵 ${track.title}`);
+  console.log(`🔗 ${track.url}`);
   console.log("================================");
-});
 
-player.events.on("playerFinish", (queue, track) => {
+  let stream;
+
+  // ====================================
+  // SOUNDCLOUD
+  // ====================================
+
+  if (track.url.includes("soundcloud.com")) {
+    console.log("☁️ SoundCloud stream...");
+
+    stream = await play.stream(track.url, {
+      quality: 2,
+      discordPlayerCompatibility: true,
+    });
+
+    console.log("✅ SoundCloud stream berhasil dibuat!");
+  }
+
+  // ====================================
+  // YOUTUBE
+  // ====================================
+
+  else {
+    console.log("▶️ YouTube/search stream...");
+
+    const result = await play.search(track.url, {
+      limit: 1,
+      source: {
+        youtube: "video",
+      },
+    });
+
+    if (!result.length) {
+      throw new Error("Lagu tidak ditemukan.");
+    }
+
+    stream = await play.stream(result[0].url, {
+      quality: 2,
+      discordPlayerCompatibility: true,
+    });
+
+    console.log("✅ YouTube stream berhasil dibuat!");
+  }
+
+  // ====================================
+  // FFMPEG
+  // ====================================
+
+  console.log("🎬 Menjalankan FFmpeg...");
+  console.log(`FFmpeg: ${ffmpegPath}`);
+
+  const ffmpeg = spawn(
+    ffmpegPath,
+    [
+      "-hide_banner",
+      "-loglevel",
+      "warning",
+
+      "-i",
+      "pipe:0",
+
+      "-vn",
+
+      "-f",
+      "s16le",
+      "-ar",
+      "48000",
+      "-ac",
+      "2",
+
+      "pipe:1",
+    ],
+    {
+      stdio: ["pipe", "pipe", "pipe"],
+    }
+  );
+
+  // ====================================
+  // PIPE INPUT
+  // ====================================
+
+  stream.stream.pipe(ffmpeg.stdin);
+
+  ffmpeg.stderr.on("data", data => {
+    const msg = data.toString().trim();
+
+    if (msg) {
+      console.log("FFMPEG:", msg);
+    }
+  });
+
+  ffmpeg.on("error", error => {
+    console.error("❌ FFmpeg error:", error);
+  });
+
+  ffmpeg.on("close", code => {
+    console.log(`🎬 FFmpeg selesai. Code: ${code}`);
+  });
+
+  // ====================================
+  // AUDIO RESOURCE
+  // ====================================
+
+  const resource = createAudioResource(
+    ffmpeg.stdout,
+    {
+      inputType: StreamType.Raw,
+      inlineVolume: true,
+    }
+  );
+
+  resource.volume.setVolume(1.0);
+
+  // ====================================
+  // PLAY
+  // ====================================
+
+  data.player.play(resource);
+
   console.log("");
   console.log("================================");
-  console.log("⏹️ PLAYER FINISH");
-  console.log(track.title);
+  console.log("▶️ AUDIO PLAYER PLAYING");
+  console.log(`🎵 ${track.title}`);
   console.log("================================");
-});
 
-player.events.on("emptyQueue", queue => {
-  console.log("📭 QUEUE EMPTY");
-});
-
-player.events.on("error", (queue, error) => {
-  console.error("");
-  console.error("================================");
-  console.error("❌ QUEUE ERROR");
-  console.error("================================");
-  console.error(error);
-});
-
-player.events.on("playerError", (queue, error) => {
-  console.error("");
-  console.error("================================");
-  console.error("❌ PLAYER ERROR");
-  console.error("================================");
-  console.error(error);
-});
-
-player.events.on("connectionError", (queue, error) => {
-  console.error("");
-  console.error("================================");
-  console.error("❌ CONNECTION ERROR");
-  console.error("================================");
-  console.error(error);
-});
+  data.current = track;
+}
 
 // ========================================
 // READY
@@ -169,41 +249,18 @@ client.once("clientReady", async () => {
   console.log(`🎵 ${client.user.tag} ONLINE`);
   console.log("================================");
 
+  console.log(`🎬 FFmpeg: ${ffmpegPath}`);
+
+  if (ffmpegPath) {
+    console.log("✅ FFmpeg tersedia!");
+  }
+
   try {
-
-    // ====================================
-    // LOAD EXTRACTORS
-    // ====================================
-
-    await player.extractors.loadMulti(
-      DefaultExtractors
-    );
-
-    console.log("✅ Extractor berhasil dimuat!");
-
-    // ====================================
-    // FFMPEG
-    // ====================================
-
-    console.log("🎬 Initializing FFmpeg...");
-
-    // Set FFmpeg path
-    process.env.FFMPEG_PATH = ffmpegPath;
-
-    console.log("FFMPEG_PATH:", process.env.FFMPEG_PATH);
-    console.log("✅ FFmpeg pipeline siap!");
-
-    // ====================================
-    // REGISTER COMMANDS
-    // ====================================
-
     const rest = new REST({
       version: "10",
     }).setToken(TOKEN);
 
-    console.log("");
-    console.log("🔧 Registering GUILD commands...");
-    console.log(`Guild: ${GUILD_ID}`);
+    console.log("🔧 Registering guild commands...");
 
     await rest.put(
       Routes.applicationGuildCommands(
@@ -220,7 +277,7 @@ client.once("clientReady", async () => {
     console.log("================================");
 
   } catch (error) {
-    console.error("❌ SETUP ERROR:");
+    console.error("❌ Command registration error:");
     console.error(error);
   }
 });
@@ -235,19 +292,9 @@ client.on("interactionCreate", async interaction => {
     return;
   }
 
-  console.log("");
-  console.log("================================");
-  console.log("📥 INTERACTION RECEIVED");
-  console.log(`Command: /${interaction.commandName}`);
-  console.log(`User: ${interaction.user.tag}`);
-  console.log(`Guild: ${interaction.guild?.name}`);
-  console.log("================================");
-
   try {
 
     await interaction.deferReply();
-
-    console.log("✅ Discord interaction acknowledged!");
 
     // ==================================
     // PLAY
@@ -256,15 +303,15 @@ client.on("interactionCreate", async interaction => {
     if (interaction.commandName === "play") {
 
       const voiceChannel =
-        interaction.member?.voice?.channel;
+        interaction.member.voice.channel;
 
       if (!voiceChannel) {
         return interaction.editReply(
-          "❌ Masuk voice channel dulu!"
+          "❌ Kamu harus masuk voice channel dulu!"
         );
       }
 
-      const song =
+      const query =
         interaction.options.getString(
           "song",
           true
@@ -278,58 +325,242 @@ client.on("interactionCreate", async interaction => {
       console.log(`User: ${interaction.user.tag}`);
       console.log(`Voice: ${voiceChannel.name}`);
       console.log(`Voice ID: ${voiceChannel.id}`);
-      console.log(`Song: ${song}`);
+      console.log(`Song: ${query}`);
       console.log("================================");
 
-      const mainPlayer = useMainPlayer();
+      // --------------------------------
+      // CREATE MUSIC SESSION
+      // --------------------------------
 
-      console.log("🔊 Connecting to voice...");
-
-      const result = await mainPlayer.play(
-        voiceChannel,
-        song,
-        {
-          nodeOptions: {
-
-            metadata: {
-              channel: interaction.channel,
-            },
-
-            leaveOnEnd: false,
-            leaveOnEmpty: false,
-            leaveOnStop: false,
-
-            volume: 100,
-          },
-
-          // Paksa proses audio melalui FFmpeg
-          ffmpeg: {
-            executable: ffmpegPath,
-          },
-        }
+      let data = getMusic(
+        interaction.guildId
       );
 
-      console.log("");
-      console.log("================================");
-      console.log("✅ PLAYER PLAY RESOLVED");
-      console.log("================================");
+      if (!data) {
 
-      console.log("🎵 Track:", result.track.title);
-      console.log("🔗 URL:", result.track.url);
+        console.log("🔊 Membuat voice connection...");
+
+        const connection =
+          joinVoiceChannel({
+            channelId: voiceChannel.id,
+            guildId: interaction.guildId,
+            adapterCreator:
+              interaction.guild.voiceAdapterCreator,
+
+            selfDeaf: true,
+            selfMute: false,
+          });
+
+        console.log(
+          "⏳ Menunggu voice connection..."
+        );
+
+        await entersState(
+          connection,
+          VoiceConnectionStatus.Ready,
+          30000
+        );
+
+        console.log(
+          "✅ Voice connection READY!"
+        );
+
+        const player =
+          createAudioPlayer({
+            behaviors: {
+              noSubscriber:
+                NoSubscriberBehavior.Play,
+            },
+          });
+
+        connection.subscribe(player);
+
+        data = {
+          connection,
+          player,
+          queue: [],
+          current: null,
+        };
+
+        music.set(
+          interaction.guildId,
+          data
+        );
+
+        // --------------------------------
+        // PLAYER EVENTS
+        // --------------------------------
+
+        player.on(
+          AudioPlayerStatus.Playing,
+          () => {
+
+            console.log("");
+            console.log(
+              "🎵 AUDIO PLAYER STATUS: PLAYING"
+            );
+
+            if (data.current) {
+              console.log(
+                `🎵 ${data.current.title}`
+              );
+            }
+          }
+        );
+
+        player.on(
+          AudioPlayerStatus.Idle,
+          async () => {
+
+            console.log("");
+            console.log(
+              "⏹️ AUDIO PLAYER STATUS: IDLE"
+            );
+
+            data.current = null;
+
+            if (data.queue.length) {
+
+              const next =
+                data.queue.shift();
+
+              try {
+                await playTrack(
+                  interaction.guildId,
+                  next
+                );
+              } catch (error) {
+                console.error(
+                  "❌ Next track error:",
+                  error
+                );
+              }
+
+            } else {
+
+              console.log(
+                "📭 QUEUE EMPTY"
+              );
+            }
+          }
+        );
+
+        player.on(
+          "error",
+          error => {
+            console.error("");
+            console.error(
+              "================================"
+            );
+            console.error(
+              "❌ AUDIO PLAYER ERROR"
+            );
+            console.error(
+              "================================"
+            );
+            console.error(error);
+          }
+        );
+      }
+
+      // --------------------------------
+      // FIND TRACK
+      // --------------------------------
+
+      let track;
+
+      if (
+        query.includes(
+          "soundcloud.com/"
+        )
+      ) {
+
+        console.log(
+          "☁️ Membuka SoundCloud URL..."
+        );
+
+        const info =
+          await play.soundcloud(query);
+
+        track = {
+          title: info.name,
+          url: info.url,
+        };
+
+      } else {
+
+        console.log(
+          "🔎 Mencari lagu..."
+        );
+
+        const results =
+          await play.search(
+            query,
+            {
+              limit: 1,
+              source: {
+                soundcloud: "track",
+                youtube: "video",
+              },
+            }
+          );
+
+        if (!results.length) {
+          return interaction.editReply(
+            "❌ Lagu tidak ditemukan."
+          );
+        }
+
+        track = {
+          title: results[0].title,
+          url: results[0].url,
+        };
+      }
+
+      console.log("");
+      console.log(
+        "➕ TRACK ADDED:"
+      );
+      console.log(track.title);
+
+      // --------------------------------
+      // IF PLAYING, QUEUE
+      // --------------------------------
+
+      if (
+        data.player.state.status ===
+        AudioPlayerStatus.Playing
+      ) {
+
+        data.queue.push(track);
+
+        return interaction.editReply(
+          `🎵 **${track.title}** masuk ke queue!`
+        );
+      }
+
+      // --------------------------------
+      // PLAY IMMEDIATELY
+      // --------------------------------
+
+      await playTrack(
+        interaction.guildId,
+        track
+      );
 
       return interaction.editReply(
-        `🎵 **${result.track.title}** sedang diputar!`
+        `🎵 **${track.title}** sedang diputar!`
       );
     }
 
     // ==================================
-    // QUEUE
+    // GET SESSION
     // ==================================
 
-    const queue =
-      useQueue(interaction.guildId);
+    const data =
+      getMusic(interaction.guildId);
 
-    if (!queue) {
+    if (!data) {
       return interaction.editReply(
         "❌ Tidak ada musik."
       );
@@ -339,15 +570,11 @@ client.on("interactionCreate", async interaction => {
     // SKIP
     // ==================================
 
-    if (interaction.commandName === "skip") {
+    if (
+      interaction.commandName === "skip"
+    ) {
 
-      if (!queue.currentTrack) {
-        return interaction.editReply(
-          "❌ Tidak ada lagu."
-        );
-      }
-
-      queue.node.skip();
+      data.player.stop();
 
       return interaction.editReply(
         "⏭️ Lagu di-skip!"
@@ -358,9 +585,11 @@ client.on("interactionCreate", async interaction => {
     // PAUSE
     // ==================================
 
-    if (interaction.commandName === "pause") {
+    if (
+      interaction.commandName === "pause"
+    ) {
 
-      queue.node.setPaused(true);
+      data.player.pause();
 
       return interaction.editReply(
         "⏸️ Musik dipause."
@@ -371,9 +600,11 @@ client.on("interactionCreate", async interaction => {
     // RESUME
     // ==================================
 
-    if (interaction.commandName === "resume") {
+    if (
+      interaction.commandName === "resume"
+    ) {
 
-      queue.node.setPaused(false);
+      data.player.unpause();
 
       return interaction.editReply(
         "▶️ Musik dilanjutkan."
@@ -384,9 +615,14 @@ client.on("interactionCreate", async interaction => {
     // STOP
     // ==================================
 
-    if (interaction.commandName === "stop") {
+    if (
+      interaction.commandName === "stop"
+    ) {
 
-      queue.delete();
+      data.queue = [];
+      data.current = null;
+
+      data.player.stop();
 
       return interaction.editReply(
         "⏹️ Musik dihentikan."
@@ -397,81 +633,61 @@ client.on("interactionCreate", async interaction => {
     // QUEUE
     // ==================================
 
-    if (interaction.commandName === "queue") {
+    if (
+      interaction.commandName === "queue"
+    ) {
 
-      const current =
-        queue.currentTrack;
-
-      const tracks =
-        queue.tracks.toArray();
-
-      let output = "";
-
-      if (current) {
-        output +=
-          `▶️ **Now Playing:** ${current.title}\n\n`;
+      if (!data.queue.length) {
+        return interaction.editReply(
+          "📭 Queue kosong."
+        );
       }
 
-      if (!tracks.length) {
-        output += "📭 Queue kosong.";
-      } else {
-
-        output += tracks
+      const list =
+        data.queue
           .slice(0, 10)
           .map(
-            (track, index) =>
-              `${index + 1}. ${track.title}`
+            (track, i) =>
+              `${i + 1}. ${track.title}`
           )
           .join("\n");
-      }
 
-      return interaction.editReply(output);
+      return interaction.editReply(
+        `📜 **Queue:**\n${list}`
+      );
     }
 
   } catch (error) {
 
     console.error("");
-    console.error("================================");
-    console.error("❌ COMMAND ERROR");
-    console.error("================================");
+    console.error(
+      "================================"
+    );
+    console.error(
+      "❌ COMMAND ERROR"
+    );
+    console.error(
+      "================================"
+    );
     console.error(error);
-    console.error("================================");
 
     try {
-
-      if (
-        interaction.deferred ||
-        interaction.replied
-      ) {
-
-        await interaction.editReply(
-          `❌ Error: \`${error.message || error}\``
-        );
-      }
-
-    } catch (replyError) {
-
-      console.error(
-        "❌ Failed to reply:"
+      await interaction.editReply(
+        `❌ Error: ${error.message || error}`
       );
-
-      console.error(replyError);
-    }
+    } catch {}
   }
 });
 
 // ========================================
-// CLIENT ERRORS
+// CLIENT ERROR
 // ========================================
 
 client.on("error", error => {
-  console.error("❌ CLIENT ERROR:");
-  console.error(error);
-});
-
-client.on("warn", warning => {
-  console.warn("⚠️ WARNING:");
-  console.warn(warning);
+  console.error(
+    "❌ Discord client error:",
+    error
+  );
 });
 
 // ========================================
