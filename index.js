@@ -1,10 +1,10 @@
-```js
+````js
 const {
   Client,
   GatewayIntentBits,
   REST,
   Routes,
-  SlashCommandBuilder,
+  SlashCommandBuilder
 } = require("discord.js");
 
 const { Kazagumo } = require("kazagumo");
@@ -18,12 +18,20 @@ const TOKEN = process.env.DISCORD_TOKEN;
 
 const GUILD_ID = "1540915302370377749";
 
-const LAVALINK_HOST = "lavalink.railway.internal";
-const LAVALINK_PORT = 2333;
-const LAVALINK_PASSWORD = "enmusic2026";
+const LAVALINK_HOST =
+  process.env.LAVALINK_HOST ||
+  "lavalink.railway.internal";
+
+const LAVALINK_PORT =
+  process.env.LAVALINK_PORT ||
+  "2333";
+
+const LAVALINK_PASSWORD =
+  process.env.LAVALINK_PASSWORD ||
+  "enmusic2026";
 
 // ======================================================
-// CHECK TOKEN
+// TOKEN CHECK
 // ======================================================
 
 if (!TOKEN) {
@@ -38,8 +46,8 @@ if (!TOKEN) {
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildVoiceStates,
-  ],
+    GatewayIntentBits.GuildVoiceStates
+  ]
 });
 
 // ======================================================
@@ -49,10 +57,16 @@ const client = new Client({
 const Nodes = [
   {
     name: "Railway-Lavalink",
-    url: `${LAVALINK_HOST}:${LAVALINK_PORT}`,
+
+    url:
+      LAVALINK_HOST +
+      ":" +
+      LAVALINK_PORT,
+
     auth: LAVALINK_PASSWORD,
-    secure: false,
-  },
+
+    secure: false
+  }
 ];
 
 // ======================================================
@@ -63,18 +77,20 @@ const kazagumo = new Kazagumo(
   {
     defaultSearchEngine: "soundcloud",
 
-    send: (guildId, payload) => {
-      const guild = client.guilds.cache.get(guildId);
+    send: function(guildId, payload) {
+      const guild =
+        client.guilds.cache.get(guildId);
 
       if (!guild) {
         console.error(
-          `❌ Guild ${guildId} tidak ditemukan`
+          "❌ Guild tidak ditemukan: " +
+          guildId
         );
         return;
       }
 
       guild.shard.send(payload);
-    },
+    }
   },
 
   new Connectors.DiscordJS(client),
@@ -91,12 +107,14 @@ const commands = [
   new SlashCommandBuilder()
     .setName("play")
     .setDescription("Putar musik")
-    .addStringOption(option =>
-      option
+    .addStringOption(function(option) {
+      return option
         .setName("song")
-        .setDescription("URL SoundCloud atau nama lagu")
-        .setRequired(true)
-    ),
+        .setDescription(
+          "URL SoundCloud atau nama lagu"
+        )
+        .setRequired(true);
+    }),
 
   new SlashCommandBuilder()
     .setName("skip")
@@ -116,9 +134,11 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("queue")
-    .setDescription("Lihat queue"),
+    .setDescription("Lihat queue")
 
-].map(command => command.toJSON());
+].map(function(command) {
+  return command.toJSON();
+});
 
 // ======================================================
 // LAVALINK EVENTS
@@ -126,12 +146,12 @@ const commands = [
 
 kazagumo.shoukaku.on(
   "ready",
-  name => {
+  function(name) {
 
     console.log("");
     console.log("================================");
     console.log("🟢 LAVALINK READY");
-    console.log(`Node: ${name}`);
+    console.log("Node: " + name);
     console.log("================================");
 
   }
@@ -139,12 +159,12 @@ kazagumo.shoukaku.on(
 
 kazagumo.shoukaku.on(
   "error",
-  (name, error) => {
+  function(name, error) {
 
     console.error("");
     console.error("================================");
     console.error("❌ LAVALINK ERROR");
-    console.error(`Node: ${name}`);
+    console.error("Node: " + name);
     console.error("================================");
     console.error(error);
 
@@ -153,15 +173,16 @@ kazagumo.shoukaku.on(
 
 kazagumo.shoukaku.on(
   "close",
-  (name, code, reason) => {
+  function(name, code, reason) {
 
     console.warn("");
     console.warn("================================");
     console.warn("⚠️ LAVALINK CLOSED");
-    console.warn(`Node: ${name}`);
-    console.warn(`Code: ${code}`);
+    console.warn("Node: " + name);
+    console.warn("Code: " + code);
     console.warn(
-      `Reason: ${reason || "No reason"}`
+      "Reason: " +
+      (reason || "Tidak ada alasan")
     );
     console.warn("================================");
 
@@ -170,14 +191,14 @@ kazagumo.shoukaku.on(
 
 kazagumo.shoukaku.on(
   "disconnect",
-  (name, count) => {
+  function(name, count) {
 
     console.warn(
-      `⚠️ Lavalink disconnected: ${name}`
-    );
-
-    console.warn(
-      `Players affected: ${count}`
+      "⚠️ Lavalink disconnected: " +
+      name +
+      " (" +
+      count +
+      ")"
     );
 
   }
@@ -185,10 +206,13 @@ kazagumo.shoukaku.on(
 
 kazagumo.shoukaku.on(
   "debug",
-  (name, info) => {
+  function(name, info) {
 
     console.log(
-      `[LAVALINK DEBUG] ${name}: ${info}`
+      "[LAVALINK DEBUG] " +
+      name +
+      ": " +
+      info
     );
 
   }
@@ -200,13 +224,13 @@ kazagumo.shoukaku.on(
 
 kazagumo.on(
   "playerStart",
-  (player, track) => {
+  function(player, track) {
 
     console.log("");
     console.log("================================");
     console.log("▶️ PLAYER START");
-    console.log(`🎵 ${track.title}`);
-    console.log(`🔗 ${track.uri}`);
+    console.log("🎵 " + track.title);
+    console.log("🔗 " + track.uri);
     console.log("================================");
 
   }
@@ -214,14 +238,23 @@ kazagumo.on(
 
 kazagumo.on(
   "playerEnd",
-  player => {
+  function(player, track) {
 
     console.log("");
     console.log("================================");
     console.log("⏹️ PLAYER END");
     console.log(
-      `Guild: ${player.guildId}`
+      "Guild: " +
+      player.guildId
     );
+
+    if (track) {
+      console.log(
+        "🎵 " +
+        track.title
+      );
+    }
+
     console.log("================================");
 
   }
@@ -229,13 +262,14 @@ kazagumo.on(
 
 kazagumo.on(
   "playerEmpty",
-  player => {
+  function(player) {
 
     console.log("");
     console.log("================================");
     console.log("📭 QUEUE EMPTY");
     console.log(
-      `Guild: ${player.guildId}`
+      "Guild: " +
+      player.guildId
     );
     console.log("================================");
 
@@ -244,13 +278,14 @@ kazagumo.on(
 
 kazagumo.on(
   "playerClosed",
-  (player, data) => {
+  function(player, data) {
 
     console.warn("");
     console.warn("================================");
     console.warn("🔌 PLAYER CLOSED");
     console.warn(
-      `Guild: ${player.guildId}`
+      "Guild: " +
+      player.guildId
     );
     console.warn(data);
     console.warn("================================");
@@ -260,14 +295,11 @@ kazagumo.on(
 
 kazagumo.on(
   "playerException",
-  (player, data) => {
+  function(player, data) {
 
     console.error("");
     console.error("================================");
     console.error("❌ PLAYER EXCEPTION");
-    console.error(
-      `Guild: ${player.guildId}`
-    );
     console.error(data);
     console.error("================================");
 
@@ -276,33 +308,12 @@ kazagumo.on(
 
 kazagumo.on(
   "playerStuck",
-  (player, data) => {
+  function(player, data) {
 
     console.error("");
     console.error("================================");
     console.error("⚠️ PLAYER STUCK");
-    console.error(
-      `Guild: ${player.guildId}`
-    );
     console.error(data);
-    console.error("================================");
-
-  }
-);
-
-kazagumo.on(
-  "playerResolveError",
-  (player, track, message) => {
-
-    console.error("");
-    console.error("================================");
-    console.error("❌ TRACK RESOLVE ERROR");
-    console.error(
-      `Track: ${track?.title || "Unknown"}`
-    );
-    console.error(
-      `Message: ${message || "Unknown"}`
-    );
     console.error("================================");
 
   }
@@ -314,32 +325,38 @@ kazagumo.on(
 
 client.once(
   "ready",
-  async () => {
+  async function() {
 
     console.log("");
     console.log("================================");
     console.log(
-      `🎵 ${client.user.tag} ONLINE`
+      "🎵 " +
+      client.user.tag +
+      " ONLINE"
     );
     console.log("================================");
 
     console.log(
-      `🔊 Lavalink: ${LAVALINK_HOST}:${LAVALINK_PORT}`
+      "🔊 Lavalink: " +
+      LAVALINK_HOST +
+      ":" +
+      LAVALINK_PORT
     );
 
     console.log(
       "🎧 Menunggu koneksi Lavalink..."
     );
 
-    // ----------------------------------------------
+    // ================================================
     // REGISTER GUILD COMMANDS
-    // ----------------------------------------------
+    // ================================================
 
     try {
 
-      const rest = new REST({
-        version: "10",
-      }).setToken(TOKEN);
+      const rest =
+        new REST({
+          version: "10"
+        }).setToken(TOKEN);
 
       console.log(
         "🔧 Registering guild commands..."
@@ -351,7 +368,7 @@ client.once(
           GUILD_ID
         ),
         {
-          body: commands,
+          body: commands
         }
       );
 
@@ -381,12 +398,12 @@ client.once(
 );
 
 // ======================================================
-// INTERACTIONS
+// INTERACTION
 // ======================================================
 
 client.on(
   "interactionCreate",
-  async interaction => {
+  async function(interaction) {
 
     if (!interaction.isChatInputCommand()) {
       return;
@@ -396,13 +413,20 @@ client.on(
     console.log("================================");
     console.log("📥 INTERACTION RECEIVED");
     console.log(
-      `Command: /${interaction.commandName}`
+      "Command: /" +
+      interaction.commandName
     );
     console.log(
-      `User: ${interaction.user.tag}`
+      "User: " +
+      interaction.user.tag
     );
     console.log(
-      `Guild: ${interaction.guild?.name || "DM"}`
+      "Guild: " +
+      (
+        interaction.guild
+          ? interaction.guild.name
+          : "DM"
+      )
     );
     console.log("================================");
 
@@ -415,14 +439,17 @@ client.on(
     ) {
 
       const voiceChannel =
-        interaction.member?.voice?.channel;
+        interaction.member &&
+        interaction.member.voice
+          ? interaction.member.voice.channel
+          : null;
 
       if (!voiceChannel) {
 
         return interaction.reply({
           content:
             "❌ Kamu harus masuk voice channel dulu!",
-          ephemeral: true,
+          ephemeral: true
         });
 
       }
@@ -433,48 +460,52 @@ client.on(
           true
         );
 
-      console.log("");
-      console.log("================================");
-      console.log("🎵 PLAY REQUEST");
-      console.log("================================");
-      console.log(
-        `Guild: ${interaction.guild.name}`
-      );
-      console.log(
-        `User: ${interaction.user.tag}`
-      );
-      console.log(
-        `Voice: ${voiceChannel.name}`
-      );
-      console.log(
-        `Voice ID: ${voiceChannel.id}`
-      );
-      console.log(
-        `Song: ${query}`
-      );
-      console.log("================================");
-
       try {
 
-        // Acknowledge interaction secepat mungkin.
         await interaction.deferReply();
 
         console.log(
           "✅ Discord interaction acknowledged!"
         );
 
-        // --------------------------------------------
-        // GET EXISTING PLAYER
-        // --------------------------------------------
+        console.log("");
+        console.log("================================");
+        console.log("🎵 PLAY REQUEST");
+        console.log("================================");
+        console.log(
+          "Guild: " +
+          interaction.guild.name
+        );
+        console.log(
+          "User: " +
+          interaction.user.tag
+        );
+        console.log(
+          "Voice: " +
+          voiceChannel.name
+        );
+        console.log(
+          "Voice ID: " +
+          voiceChannel.id
+        );
+        console.log(
+          "Song: " +
+          query
+        );
+        console.log("================================");
+
+        // ============================================
+        // GET PLAYER
+        // ============================================
 
         let player =
           kazagumo.players.get(
             interaction.guildId
           );
 
-        // --------------------------------------------
+        // ============================================
         // CREATE PLAYER
-        // --------------------------------------------
+        // ============================================
 
         if (!player) {
 
@@ -484,7 +515,6 @@ client.on(
 
           player =
             await kazagumo.createPlayer({
-
               guildId:
                 interaction.guildId,
 
@@ -496,8 +526,7 @@ client.on(
 
               volume: 100,
 
-              deaf: true,
-
+              deaf: true
             });
 
           console.log(
@@ -510,52 +539,44 @@ client.on(
             "♻️ Player sudah ada."
           );
 
-          // Pindah voice bila diperlukan.
           if (
             player.voiceId !==
             voiceChannel.id
           ) {
 
             console.log(
-              "🔄 Memindahkan player ke voice channel..."
+              "🔄 Memindahkan player..."
             );
 
-            player.setVoiceChannel(
+            await player.setVoiceChannel(
               voiceChannel.id
             );
 
           }
 
-          player.setTextChannel(
-            interaction.channelId
-          );
-
         }
 
-        // --------------------------------------------
+        // ============================================
         // SEARCH
-        // --------------------------------------------
-
-        console.log(
-          "🔎 Mencari track di Lavalink..."
-        );
+        // ============================================
 
         let searchQuery = query;
 
-        // Nama lagu biasa -> SoundCloud search.
         if (
-          !query.includes(
+          query.indexOf(
             "soundcloud.com/"
-          )
+          ) === -1
         ) {
 
           searchQuery =
-            `scsearch:${query}`;
+            "scsearch:" +
+            query;
 
         }
 
         console.log(
-          `🔎 Query: ${searchQuery}`
+          "🔎 Search: " +
+          searchQuery
         );
 
         const result =
@@ -563,16 +584,18 @@ client.on(
             searchQuery,
             {
               requester:
-                interaction.user,
+                interaction.user
             }
           );
 
         console.log(
-          `📦 Result type: ${result.type}`
+          "📦 Result type: " +
+          result.type
         );
 
         console.log(
-          `🎵 Jumlah track: ${result.tracks.length}`
+          "🎵 Tracks found: " +
+          result.tracks.length
         );
 
         if (
@@ -580,14 +603,14 @@ client.on(
         ) {
 
           return interaction.editReply(
-            "❌ Lagu tidak ditemukan oleh Lavalink."
+            "❌ Lagu tidak ditemukan."
           );
 
         }
 
-        // --------------------------------------------
-        // ADD TRACK
-        // --------------------------------------------
+        // ============================================
+        // QUEUE
+        // ============================================
 
         if (
           result.type === "PLAYLIST"
@@ -598,7 +621,9 @@ client.on(
           );
 
           console.log(
-            `➕ ${result.tracks.length} track ditambahkan.`
+            "➕ " +
+            result.tracks.length +
+            " track ditambahkan."
           );
 
         } else {
@@ -615,20 +640,23 @@ client.on(
             "➕ TRACK ADDED"
           );
           console.log(
-            `🎵 ${track.title}`
+            "🎵 " +
+            track.title
           );
           console.log(
-            `👤 ${track.author}`
+            "👤 " +
+            track.author
           );
           console.log(
-            `🔗 ${track.uri}`
+            "🔗 " +
+            track.uri
           );
 
         }
 
-        // --------------------------------------------
+        // ============================================
         // PLAY
-        // --------------------------------------------
+        // ============================================
 
         if (
           !player.playing &&
@@ -648,27 +676,31 @@ client.on(
         } else {
 
           console.log(
-            "📥 Player sedang berjalan, track masuk queue."
+            "📥 Player sedang berjalan."
           );
 
         }
 
-        // --------------------------------------------
-        // REPLY
-        // --------------------------------------------
+        // ============================================
+        // RESPONSE
+        // ============================================
 
         if (
           result.type === "PLAYLIST"
         ) {
 
           return interaction.editReply(
-            `📚 **${result.tracks.length} lagu** masuk queue.`
+            "📚 " +
+            result.tracks.length +
+            " lagu masuk queue!"
           );
 
         }
 
         return interaction.editReply(
-          `🎵 **${result.tracks[0].title}** masuk queue!`
+          "🎵 **" +
+          result.tracks[0].title +
+          "** masuk queue!"
         );
 
       } catch (error) {
@@ -685,10 +717,6 @@ client.on(
         );
         console.error(error);
 
-        const message =
-          error?.message ||
-          "Unknown error";
-
         try {
 
           if (
@@ -697,7 +725,13 @@ client.on(
           ) {
 
             await interaction.editReply(
-              `❌ Gagal memutar musik:\n\`${message}\``
+              "❌ Gagal memutar musik:\n" +
+              "```" +
+              (
+                error.message ||
+                "Unknown error"
+              ) +
+              "```"
             );
 
           }
@@ -705,7 +739,7 @@ client.on(
         } catch (replyError) {
 
           console.error(
-            "❌ Gagal mengirim error ke Discord:",
+            "❌ Reply error:",
             replyError
           );
 
@@ -730,7 +764,7 @@ client.on(
       return interaction.reply({
         content:
           "❌ Tidak ada musik yang sedang diputar.",
-        ephemeral: true,
+        ephemeral: true
       });
 
     }
@@ -745,7 +779,7 @@ client.on(
 
       try {
 
-        player.skip();
+        await player.skip();
 
         return interaction.reply(
           "⏭️ Lagu di-skip!"
@@ -757,8 +791,8 @@ client.on(
 
         return interaction.reply({
           content:
-            "❌ Gagal skip lagu.",
-          ephemeral: true,
+            "❌ Gagal skip.",
+          ephemeral: true
         });
 
       }
@@ -775,7 +809,7 @@ client.on(
 
       try {
 
-        player.pause(true);
+        await player.pause(true);
 
         return interaction.reply(
           "⏸️ Musik dipause."
@@ -787,8 +821,8 @@ client.on(
 
         return interaction.reply({
           content:
-            "❌ Gagal pause musik.",
-          ephemeral: true,
+            "❌ Gagal pause.",
+          ephemeral: true
         });
 
       }
@@ -805,7 +839,7 @@ client.on(
 
       try {
 
-        player.pause(false);
+        await player.pause(false);
 
         return interaction.reply(
           "▶️ Musik dilanjutkan."
@@ -817,8 +851,8 @@ client.on(
 
         return interaction.reply({
           content:
-            "❌ Gagal melanjutkan musik.",
-          ephemeral: true,
+            "❌ Gagal resume.",
+          ephemeral: true
         });
 
       }
@@ -837,7 +871,7 @@ client.on(
 
         player.queue.clear();
 
-        player.destroy();
+        await player.destroy();
 
         return interaction.reply(
           "⏹️ Musik dihentikan."
@@ -849,8 +883,8 @@ client.on(
 
         return interaction.reply({
           content:
-            "❌ Gagal menghentikan musik.",
-          ephemeral: true,
+            "❌ Gagal stop.",
+          ephemeral: true
         });
 
       }
@@ -867,11 +901,8 @@ client.on(
 
       try {
 
-        const tracks =
-          player.queue;
-
         if (
-          tracks.length === 0
+          player.queue.length === 0
         ) {
 
           return interaction.reply(
@@ -881,16 +912,22 @@ client.on(
         }
 
         const list =
-          tracks
+          player.queue
             .slice(0, 10)
-            .map(
-              (track, index) =>
-                `${index + 1}. ${track.title}`
-            )
+            .map(function(track, index) {
+
+              return (
+                (index + 1) +
+                ". " +
+                track.title
+              );
+
+            })
             .join("\n");
 
         return interaction.reply(
-          `📜 **Queue:**\n${list}`
+          "📜 **Queue:**\n" +
+          list
         );
 
       } catch (error) {
@@ -900,7 +937,7 @@ client.on(
         return interaction.reply({
           content:
             "❌ Gagal membaca queue.",
-          ephemeral: true,
+          ephemeral: true
         });
 
       }
@@ -916,7 +953,7 @@ client.on(
 
 client.on(
   "error",
-  error => {
+  function(error) {
 
     console.error(
       "❌ Discord Client Error:",
@@ -928,7 +965,7 @@ client.on(
 
 process.on(
   "unhandledRejection",
-  error => {
+  function(error) {
 
     console.error(
       "❌ UNHANDLED REJECTION:",
@@ -940,7 +977,7 @@ process.on(
 
 process.on(
   "uncaughtException",
-  error => {
+  function(error) {
 
     console.error(
       "❌ UNCAUGHT EXCEPTION:",
@@ -960,4 +997,4 @@ console.log("🚀 Starting EnMusic...");
 console.log("================================");
 
 client.login(TOKEN);
-```
+````
