@@ -16,9 +16,9 @@ const {
   DefaultExtractors,
 } = require("@discord-player/extractor");
 
-// ===============================
+// ========================================
 // DISCORD CLIENT
-// ===============================
+// ========================================
 
 const client = new Client({
   intents: [
@@ -27,27 +27,27 @@ const client = new Client({
   ],
 });
 
-// ===============================
+// ========================================
 // MUSIC PLAYER
-// ===============================
+// ========================================
 
 const player = new Player(client);
 
-// Player error logging
+// Player error
 player.on("error", (queue, error) => {
   console.error("❌ PLAYER ERROR:");
   console.error(error);
 });
 
-// Queue error logging
+// Queue error
 player.events.on("error", (queue, error) => {
   console.error("❌ QUEUE ERROR:");
   console.error(error);
 });
 
-// ===============================
+// ========================================
 // SLASH COMMANDS
-// ===============================
+// ========================================
 
 const commands = [
   new SlashCommandBuilder()
@@ -81,18 +81,20 @@ const commands = [
     .setDescription("Lihat antrean lagu"),
 ].map(command => command.toJSON());
 
-// ===============================
+// ========================================
 // BOT READY
-// ===============================
+// ========================================
 
 client.once("ready", async () => {
   console.log(`🎵 ${client.user.tag} sudah online!`);
 
   try {
+    // Load music extractors
     await player.extractors.loadMulti(DefaultExtractors);
 
     console.log("✅ Extractor berhasil dimuat!");
 
+    // Register slash commands
     const rest = new REST({ version: "10" })
       .setToken(process.env.DISCORD_TOKEN);
 
@@ -110,18 +112,18 @@ client.once("ready", async () => {
   }
 });
 
-// ===============================
-// SLASH COMMAND HANDLER
-// ===============================
+// ========================================
+// INTERACTION HANDLER
+// ========================================
 
 client.on("interactionCreate", async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
   try {
 
-    // ===========================
+    // ====================================
     // /PLAY
-    // ===========================
+    // ====================================
 
     if (interaction.commandName === "play") {
 
@@ -140,14 +142,21 @@ client.on("interactionCreate", async interaction => {
 
       await interaction.deferReply();
 
-      console.log("🎵 PLAY REQUEST:");
+      console.log("");
+      console.log("================================");
+      console.log("🎵 PLAY REQUEST");
+      console.log("================================");
       console.log("Guild:", interaction.guild?.name);
+      console.log("User:", interaction.user.tag);
       console.log("Voice:", voiceChannel.name);
       console.log("Song:", song);
 
       const mainPlayer = useMainPlayer();
 
       try {
+
+        console.log("🔊 Mencoba connect ke voice...");
+        console.log("🔊 Voice channel ID:", voiceChannel.id);
 
         const result = await mainPlayer.play(
           voiceChannel,
@@ -167,17 +176,37 @@ client.on("interactionCreate", async interaction => {
           }
         );
 
-        console.log("✅ TRACK BERHASIL DITAMBAHKAN:");
-        console.log(result.track.title);
+        console.log("✅ player.play() selesai!");
 
-        return interaction.editReply(
-          `🎵 **${result.track.title}** masuk ke queue!`
-        );
+        if (result?.track) {
+
+          console.log(
+            "🎵 Track:",
+            result.track.title
+          );
+
+          return interaction.editReply(
+            `🎵 **${result.track.title}** masuk ke queue!`
+          );
+
+        } else {
+
+          console.log(
+            "⚠️ player.play() tidak mengembalikan track"
+          );
+
+          return interaction.editReply(
+            "⚠️ Lagu ditemukan, tapi track tidak berhasil dibuat."
+          );
+        }
 
       } catch (error) {
 
-        console.error("❌ PLAY ERROR:");
+        console.error("");
+        console.error("❌ PLAY ERROR");
+        console.error("================================");
         console.error(error);
+        console.error("================================");
 
         return interaction.editReply(
           `❌ Gagal memutar lagu.\n\`${error.message}\``
@@ -185,9 +214,9 @@ client.on("interactionCreate", async interaction => {
       }
     }
 
-    // ===========================
-    // GET QUEUE
-    // ===========================
+    // ====================================
+    // QUEUE
+    // ====================================
 
     const queue = useQueue(interaction.guildId);
 
@@ -197,9 +226,9 @@ client.on("interactionCreate", async interaction => {
       );
     }
 
-    // ===========================
+    // ====================================
     // /SKIP
-    // ===========================
+    // ====================================
 
     if (interaction.commandName === "skip") {
 
@@ -209,6 +238,8 @@ client.on("interactionCreate", async interaction => {
         );
       }
 
+      console.log("⏭️ Skip:", queue.currentTrack.title);
+
       queue.node.skip();
 
       return interaction.reply(
@@ -216,37 +247,43 @@ client.on("interactionCreate", async interaction => {
       );
     }
 
-    // ===========================
+    // ====================================
     // /PAUSE
-    // ===========================
+    // ====================================
 
     if (interaction.commandName === "pause") {
 
       queue.node.setPaused(true);
+
+      console.log("⏸️ Music paused");
 
       return interaction.reply(
         "⏸️ Musik dipause."
       );
     }
 
-    // ===========================
+    // ====================================
     // /RESUME
-    // ===========================
+    // ====================================
 
     if (interaction.commandName === "resume") {
 
       queue.node.setPaused(false);
+
+      console.log("▶️ Music resumed");
 
       return interaction.reply(
         "▶️ Musik dilanjutkan."
       );
     }
 
-    // ===========================
+    // ====================================
     // /STOP
-    // ===========================
+    // ====================================
 
     if (interaction.commandName === "stop") {
+
+      console.log("⏹️ Music stopped");
 
       queue.delete();
 
@@ -255,19 +292,13 @@ client.on("interactionCreate", async interaction => {
       );
     }
 
-    // ===========================
+    // ====================================
     // /QUEUE
-    // ===========================
+    // ====================================
 
     if (interaction.commandName === "queue") {
 
       const tracks = queue.tracks.toArray();
-
-      if (!queue.currentTrack && tracks.length === 0) {
-        return interaction.reply(
-          "🎵 Queue kosong."
-        );
-      }
 
       let message = "📜 **Music Queue**\n\n";
 
@@ -287,7 +318,9 @@ client.on("interactionCreate", async interaction => {
           .join("\n");
 
         message += list;
+
       } else {
+
         message += "Tidak ada lagu berikutnya.";
       }
 
@@ -296,7 +329,8 @@ client.on("interactionCreate", async interaction => {
 
   } catch (error) {
 
-    console.error("❌ INTERACTION ERROR:");
+    console.error("");
+    console.error("❌ INTERACTION ERROR");
     console.error(error);
 
     if (
@@ -317,22 +351,24 @@ client.on("interactionCreate", async interaction => {
   }
 });
 
-// ===============================
-// GLOBAL ERROR LOGGING
-// ===============================
+// ========================================
+// GLOBAL ERROR HANDLING
+// ========================================
 
 process.on("unhandledRejection", error => {
-  console.error("❌ UNHANDLED REJECTION:");
+  console.error("");
+  console.error("❌ UNHANDLED REJECTION");
   console.error(error);
 });
 
 process.on("uncaughtException", error => {
-  console.error("❌ UNCAUGHT EXCEPTION:");
+  console.error("");
+  console.error("❌ UNCAUGHT EXCEPTION");
   console.error(error);
 });
 
-// ===============================
+// ========================================
 // LOGIN
-// ===============================
+// ========================================
 
 client.login(process.env.DISCORD_TOKEN);
