@@ -37,16 +37,16 @@ const client = new Client({
 const player = new Player(client);
 
 // ========================================
-// PLAYER DEBUG EVENTS
+// PLAYER EVENTS / DEBUG
 // ========================================
-
-player.events.on("playerStart", (queue, track) => {
-  console.log("▶️ PLAYER START:");
-  console.log(track.title);
-});
 
 player.events.on("audioTrackAdd", (queue, track) => {
   console.log("➕ TRACK ADDED:");
+  console.log(track.title);
+});
+
+player.events.on("playerStart", (queue, track) => {
+  console.log("▶️ PLAYER START:");
   console.log(track.title);
 });
 
@@ -94,7 +94,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("resume")
-    .setDescription("Lanjutkan lagu"),
+    .setDescription("Resume lagu"),
 
   new SlashCommandBuilder()
     .setName("stop")
@@ -207,18 +207,18 @@ client.on("interactionCreate", async interaction => {
 
         console.log("✅ player.play() selesai!");
 
-        if (result?.track) {
-
-          console.log("🎵 TRACK:");
-          console.log(result.track.title);
+        if (!result?.track) {
 
           return interaction.editReply(
-            `🎵 **${result.track.title}** masuk ke queue!`
+            "⚠️ Track ditemukan tetapi player tidak mengembalikan track."
           );
         }
 
+        console.log("🎵 TRACK:");
+        console.log(result.track.title);
+
         return interaction.editReply(
-          "⚠️ Track ditemukan tetapi player tidak mengembalikan track."
+          `🎵 **${result.track.title}** masuk ke queue!`
         );
 
       } catch (error) {
@@ -326,9 +326,12 @@ client.on("interactionCreate", async interaction => {
       let message = "📜 **MUSIC QUEUE**\n\n";
 
       if (queue.currentTrack) {
+
         message +=
           `▶️ Sekarang: **${queue.currentTrack.title}**\n\n`;
+
       } else {
+
         message +=
           "▶️ Sekarang: Tidak ada\n\n";
       }
@@ -337,7 +340,8 @@ client.on("interactionCreate", async interaction => {
 
       if (tracks.length === 0) {
 
-        message += "📭 Tidak ada lagu berikutnya.";
+        message +=
+          "📭 Tidak ada lagu berikutnya.";
 
       } else {
 
@@ -383,18 +387,21 @@ client.on("interactionCreate", async interaction => {
 });
 
 // ========================================
-// FFMPEG TEST
+// FFMPEG CHECK
 // ========================================
 
 console.log("");
 console.log("================================");
 console.log("🎬 FFMPEG CHECK");
 console.log("================================");
+
 console.log("FFmpeg path:", ffmpeg);
 
 if (!ffmpeg) {
 
-  console.error("❌ FFmpeg binary tidak ditemukan!");
+  console.error(
+    "❌ FFmpeg binary tidak ditemukan!"
+  );
 
 } else {
 
@@ -405,7 +412,10 @@ if (!ffmpeg) {
 
       if (error) {
 
-        console.error("❌ FFmpeg ERROR:");
+        console.error(
+          "❌ FFmpeg ERROR:"
+        );
+
         console.error(error);
 
         if (stderr) {
@@ -415,7 +425,10 @@ if (!ffmpeg) {
         return;
       }
 
-      console.log("✅ FFmpeg BERHASIL!");
+      console.log(
+        "✅ FFmpeg BERHASIL!"
+      );
+
       console.log(
         stdout.split("\n")[0]
       );
